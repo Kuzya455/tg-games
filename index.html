@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Сапёр</title>
+    <script src="https://telegram.org/js/telegram-web-app.js?65"></script>
+    <style>
+        :root
+        {
+            --bg: var(--tg-theme-bg-color, #ffffff);
+            --text: var(--tg-theme-text-color, #222222);
+            --hint: var(--tg-theme-hint-color, #8a8a8a);
+            --accent: var(--tg-theme-button-color, #3390ec);
+            --accent-text: var(--tg-theme-button-text-color, #ffffff);
+            --panel: var(--tg-theme-secondary-bg-color, #f1f3f5);
+        }
+        @media (prefers-color-scheme: dark)
+        {
+            :root
+            {
+                --bg: var(--tg-theme-bg-color, #17212b);
+                --text: var(--tg-theme-text-color, #f5f5f5);
+                --hint: var(--tg-theme-hint-color, #7d8e98);
+                --accent: var(--tg-theme-button-color, #5288c1);
+                --accent-text: var(--tg-theme-button-text-color, #ffffff);
+                --panel: var(--tg-theme-secondary-bg-color, #232e3c);
+            }
+        }
+        *
+        {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        html, body
+        {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            overscroll-behavior: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body
+        {
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px);
+            display: flex;
+            justify-content: center;
+        }
+        .app
+        {
+            width: 100%;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .title
+        {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        .player
+        {
+            font-size: 13px;
+            color: var(--hint);
+            margin-top: -8px;
+            min-height: 16px;
+        }
+        .stats
+        {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .stat
+        {
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 8px 10px;
+            text-align: center;
+            font-size: 15px;
+        }
+        .stat b
+        {
+            font-size: 17px;
+        }
+        .seg
+        {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 4px;
+        }
+        button
+        {
+            font: inherit;
+            border: 0;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .seg button
+        {
+            padding: 8px 0;
+            border-radius: 9px;
+            background: transparent;
+            color: var(--text);
+            font-size: 14px;
+        }
+        .seg button.on
+        {
+            background: var(--accent);
+            color: var(--accent-text);
+            font-weight: 600;
+        }
+        .board
+        {
+            display: grid;
+            gap: 3px;
+            touch-action: manipulation;
+        }
+        .cell
+        {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            background: var(--accent);
+            color: #ffffff;
+            font-size: var(--cell-font, 18px);
+            font-weight: 700;
+            line-height: 1;
+        }
+        .cell.open
+        {
+            background: var(--panel);
+        }
+        .cell.boom
+        {
+            background: #e74c3c;
+        }
+        .cell.wrong
+        {
+            background: #f5b7b1;
+        }
+        .cell.n1 { color: #1e88e5; }
+        .cell.n2 { color: #2e9d4f; }
+        .cell.n3 { color: #e53935; }
+        .cell.n4 { color: #8e44ad; }
+        .cell.n5 { color: #ef6c00; }
+        .cell.n6 { color: #00897b; }
+        .cell.n7 { color: var(--text); }
+        .cell.n8 { color: var(--hint); }
+        .status
+        {
+            min-height: 24px;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 600;
+        }
+        .row
+        {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .main
+        {
+            padding: 14px 8px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 12px;
+            background: var(--accent);
+            color: var(--accent-text);
+        }
+        .main.alt
+        {
+            background: var(--panel);
+            color: var(--text);
+        }
+        .main.flagmode
+        {
+            background: #e67e22;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="title">Сапёр</div>
+        <div class="player" id="player"></div>
+        <div class="stats">
+            <div class="stat">💣 <b id="mines">10</b></div>
+            <div class="stat">⏱ <b id="time">0</b></div>
+            <div class="stat">🏆 <b id="best">—</b></div>
+        </div>
+        <div class="seg" id="levels">
+            <button data-level="easy" class="on">Лёгкий</button>
+            <button data-level="medium">Средний</button>
+            <button data-level="hard">Сложный</button>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="status" id="status"></div>
+        <div class="row">
+            <button class="main" id="modeBtn">⛏ Открывать</button>
+            <button class="main alt" id="newBtn">Новая игра</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+
+        function supports(version)
+        {
+            return !!tg && typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast(version);
+        }
+
+        if (tg)
+        {
+            tg.ready();
+            tg.expand();
+            if (supports('7.7') && typeof tg.disableVerticalSwipes === 'function')
+            {
+                tg.disableVerticalSwipes();
+            }
+            const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+            if (user && user.first_name)
+            {
+                document.getElementById('player').textContent = 'Игрок: ' + user.first_name;
+            }
+        }
+
+        function haptic(kind)
+        {
+            if (!supports('6.1') || !tg.HapticFeedback)
+            {
+                return;
+            }
+            if (kind === 'tap')
+            {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+            else if (kind === 'flag')
+            {
+                tg.HapticFeedback.selectionChanged();
+            }
+            else if (kind === 'lose')
+            {
+                tg.HapticFeedback.notificationOccurred('error');
+            }
+            else if (kind === 'win')
+            {
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+        }
+
+        const STORAGE_KEY = 'minesweeper_best';
+
+        function readLocalBests()
+        {
+            try
+            {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+            }
+            catch (e)
+            {
+                return {};
+            }
+        }
+
+        function parseBests(text)
+        {
+            try
+            {
+                const value = JSON.parse(text);
+                return value && typeof value === 'object' ? value : {};
+            }
+            catch (e)
+            {
+                return {};
+            }
+        }
+
+        function loadBests(callback)
+        {
+            if (supports('6.9') && tg.CloudStorage)
+            {
+                tg.CloudStorage.getItem(STORAGE_KEY, (error, value) =>
+                {
+                    callback(!error && value ? parseBests(value) : readLocalBests());
+                });
+            }
+            else
+            {
+                callback(readLocalBests());
+            }
+        }
+
+        function saveBests(value)
+        {
+            const text = JSON.stringify(value);
+            try
+            {
+                localStorage.setItem(STORAGE_KEY, text);
+            }
+            catch (e) { }
+            if (supports('6.9') && tg.CloudStorage)
+            {
+                tg.CloudStorage.setItem(STORAGE_KEY, text);
+            }
+        }
+
+        const LEVELS = {
+            easy: { cols: 8, rows: 8, mines: 10 },
+            medium: { cols: 9, rows: 12, mines: 20 },
+            hard: { cols: 10, rows: 14, mines: 32 }
+        };
+        const LONG_PRESS_MS = 450;
+
+        const boardBox = document.getElementById('board');
+        const minesBox = document.getElementById('mines');
+        const timeBox = document.getElementById('time');
+        const bestBox = document.getElementById('best');
+        const statusBox = document.getElementById('status');
+        const modeBtn = document.getElementById('modeBtn');
+        const newBtn = document.getElementById('newBtn');
+        const levelsBox = document.getElementById('levels');
+
+        let level = 'easy';
+        let cfg = LEVELS[level];
+        let cells = [];
+        let cellEls = [];
+        let state = 'ready';
+        let flagsUsed = 0;
+        let opened = 0;
+        let startTime = 0;
+        let timerId = null;
+        let flagMode = false;
+        let bests = {};
+        let press = null;
+
+        function neighbors(index)
+        {
+            const x = index % cfg.cols;
+            const y = Math.floor(index / cfg.cols);
+            const list = [];
+            for (let dy = -1; dy <= 1; dy++)
+            {
+                for (let dx = -1; dx <= 1; dx++)
+                {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if ((dx !== 0 || dy !== 0) && nx >= 0 && nx < cfg.cols && ny >= 0 && ny < cfg.rows)
+                    {
+                        list.push(ny * cfg.cols + nx);
+                    }
+                }
+            }
+            return list;
+        }
+
+        function showBest()
+        {
+            bestBox.textContent = bests[level] ? bests[level] + ' с' : '—';
+        }
+
+        function showMines()
+        {
+            minesBox.textContent = cfg.mines - flagsUsed;
+        }
+
+        function stopTimer()
+        {
+            clearInterval(timerId);
+            timerId = null;
+        }
+
+        function startTimer()
+        {
+            startTime = Date.now();
+            timerId = setInterval(() =>
+            {
+                timeBox.textContent = Math.min(999, Math.floor((Date.now() - startTime) / 1000));
+            }, 250);
+        }
+
+        function renderCell(index)
+        {
+            const cell = cells[index];
+            let cls = 'cell';
+            let text = '';
+            if (cell.open)
+            {
+                cls += ' open';
+                if (cell.mine)
+                {
+                    cls += ' boom';
+                    text = '💣';
+                }
+                else if (cell.count > 0)
+                {
+                    cls += ' n' + cell.count;
+                    text = cell.count;
+                }
+            }
+            else if (cell.flag)
+            {
+                text = '🚩';
+                if (state === 'lost' && !cell.mine)
+                {
+                    cls += ' wrong';
+                    text = '❌';
+                }
+            }
+            else if (state === 'lost' && cell.mine)
+            {
+                cls += ' open';
+                text = '💣';
+            }
+            cellEls[index].className = cls;
+            cellEls[index].textContent = text;
+        }
+
+        function renderAll()
+        {
+            cells.forEach((_, i) => renderCell(i));
+        }
+
+        function fitBoard()
+        {
+            const size = boardBox.clientWidth / cfg.cols;
+            boardBox.style.setProperty('--cell-font', Math.round(size * 0.55) + 'px');
+        }
+
+        function newGame()
+        {
+            cfg = LEVELS[level];
+            stopTimer();
+            cells = Array.from({ length: cfg.cols * cfg.rows }, () => ({ mine: false, open: false, flag: false, count: 0 }));
+            state = 'ready';
+            flagsUsed = 0;
+            opened = 0;
+            press = null;
+            boardBox.style.gridTemplateColumns = `repeat(${cfg.cols}, 1fr)`;
+            boardBox.innerHTML = cells.map((_, i) => `<div class="cell" data-i="${i}"></div>`).join('');
+            cellEls = Array.from(boardBox.children);
+            timeBox.textContent = '0';
+            statusBox.textContent = '';
+            showMines();
+            showBest();
+            fitBoard();
+        }
+
+        function placeMines(safe)
+        {
+            const forbidden = new Set([safe].concat(neighbors(safe)));
+            const all = cells.map((_, i) => i);
+            let pool = all.filter(i => !forbidden.has(i));
+            if (pool.length < cfg.mines)
+            {
+                pool = all.filter(i => i !== safe);
+            }
+            for (let i = pool.length - 1; i > 0; i--)
+            {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+            pool.slice(0, cfg.mines).forEach(i => { cells[i].mine = true; });
+            cells.forEach((cell, i) =>
+            {
+                cell.count = neighbors(i).filter(n => cells[n].mine).length;
+            });
+        }
+
+        function floodOpen(start)
+        {
+            const stack = [start];
+            while (stack.length > 0)
+            {
+                const index = stack.pop();
+                const cell = cells[index];
+                if (cell.open || cell.flag)
+                {
+                    continue;
+                }
+                cell.open = true;
+                opened++;
+                renderCell(index);
+                if (cell.count === 0)
+                {
+                    neighbors(index).forEach(n =>
+                    {
+                        if (!cells[n].open)
+                        {
+                            stack.push(n);
+                        }
+                    });
+                }
+            }
+        }
+
+        function lose(index)
+        {
+            state = 'lost';
+            stopTimer();
+            cells[index].open = true;
+            renderAll();
+            statusBox.textContent = 'Мина! Игра окончена';
+            haptic('lose');
+        }
+
+        function win()
+        {
+            state = 'won';
+            stopTimer();
+            cells.forEach(cell =>
+            {
+                if (cell.mine)
+                {
+                    cell.flag = true;
+                }
+            });
+            flagsUsed = cfg.mines;
+            renderAll();
+            showMines();
+            const seconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+            timeBox.textContent = Math.min(999, seconds);
+            const record = !bests[level] || seconds < bests[level];
+            if (record)
+            {
+                bests[level] = seconds;
+                saveBests(bests);
+                showBest();
+            }
+            statusBox.textContent = `Победа! ${seconds} с` + (record ? ' — новый рекорд!' : '');
+            haptic('win');
+        }
+
+        function checkWin()
+        {
+            if (state === 'playing' && opened === cells.length - cfg.mines)
+            {
+                win();
+            }
+        }
+
+        function chord(index)
+        {
+            const cell = cells[index];
+            if (cell.count === 0)
+            {
+                return;
+            }
+            const around = neighbors(index);
+            if (around.filter(n => cells[n].flag).length !== cell.count)
+            {
+                return;
+            }
+            for (const n of around)
+            {
+                if (!cells[n].flag && !cells[n].open)
+                {
+                    if (cells[n].mine)
+                    {
+                        lose(n);
+                        return;
+                    }
+                    floodOpen(n);
+                }
+            }
+            haptic('tap');
+            checkWin();
+        }
+
+        function openCell(index)
+        {
+            const cell = cells[index];
+            if (cell.open)
+            {
+                chord(index);
+                return;
+            }
+            if (cell.flag)
+            {
+                return;
+            }
+            if (state === 'ready')
+            {
+                placeMines(index);
+                state = 'playing';
+                startTimer();
+            }
+            if (cell.mine)
+            {
+                lose(index);
+                return;
+            }
+            floodOpen(index);
+            haptic('tap');
+            checkWin();
+        }
+
+        function toggleFlag(index)
+        {
+            const cell = cells[index];
+            if (cell.open)
+            {
+                return;
+            }
+            cell.flag = !cell.flag;
+            flagsUsed += cell.flag ? 1 : -1;
+            renderCell(index);
+            showMines();
+            haptic('flag');
+        }
+
+        function act(index, kind)
+        {
+            if (state === 'won' || state === 'lost')
+            {
+                return;
+            }
+            if (kind === 'flag')
+            {
+                toggleFlag(index);
+            }
+            else
+            {
+                openCell(index);
+            }
+        }
+
+        function cellIndex(target)
+        {
+            const el = target.closest ? target.closest('.cell') : null;
+            return el ? Number(el.dataset.i) : -1;
+        }
+
+        boardBox.addEventListener('pointerdown', e =>
+        {
+            const index = cellIndex(e.target);
+            if (index < 0 || e.button === 2)
+            {
+                return;
+            }
+            press = { index: index, long: false, timer: null };
+            const current = press;
+            current.timer = setTimeout(() =>
+            {
+                if (press === current)
+                {
+                    current.long = true;
+                    act(index, 'flag');
+                }
+            }, LONG_PRESS_MS);
+        });
+
+        boardBox.addEventListener('pointerup', e =>
+        {
+            if (!press)
+            {
+                return;
+            }
+            clearTimeout(press.timer);
+            const finished = press;
+            press = null;
+            if (!finished.long && cellIndex(e.target) === finished.index)
+            {
+                act(finished.index, flagMode ? 'flag' : 'open');
+            }
+        });
+
+        function cancelPress()
+        {
+            if (press)
+            {
+                clearTimeout(press.timer);
+                press = null;
+            }
+        }
+
+        boardBox.addEventListener('pointercancel', cancelPress);
+        boardBox.addEventListener('pointerleave', cancelPress);
+
+        boardBox.addEventListener('contextmenu', e =>
+        {
+            e.preventDefault();
+            if (press && press.long)
+            {
+                return;
+            }
+            const index = cellIndex(e.target);
+            if (index >= 0)
+            {
+                act(index, 'flag');
+            }
+        });
+
+        modeBtn.addEventListener('click', () =>
+        {
+            flagMode = !flagMode;
+            modeBtn.textContent = flagMode ? '🚩 Флажки' : '⛏ Открывать';
+            modeBtn.classList.toggle('flagmode', flagMode);
+            haptic('flag');
+        });
+
+        newBtn.addEventListener('click', newGame);
+
+        levelsBox.addEventListener('click', e =>
+        {
+            const button = e.target.closest('button');
+            if (!button || button.dataset.level === level)
+            {
+                return;
+            }
+            level = button.dataset.level;
+            levelsBox.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === button));
+            newGame();
+        });
+
+        window.addEventListener('resize', fitBoard);
+
+        newGame();
+        loadBests(value =>
+        {
+            bests = value;
+            showBest();
+        });
+    </script>
+</body>
+</html>
